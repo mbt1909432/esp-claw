@@ -134,9 +134,19 @@
       },
       {
         "type": "send_message",
+        "fail_open": true,
         "input": {
           "channel": "{{event.source_channel}}",
           "chat_id": "{{event.chat_id}}"
+        }
+      },
+      {
+        "type": "call_cap",
+        "cap": "delete_file",
+        "capture_output": false,
+        "fail_open": true,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
         }
       }
     ]
@@ -152,10 +162,20 @@
     "actions": [
       {
         "type": "send_message",
+        "fail_open": true,
         "input": {
           "channel": "{{event.source_channel}}",
           "chat_id": "{{event.chat_id}}",
           "message": "File received from {{event.source_channel}}"
+        }
+      },
+      {
+        "type": "call_cap",
+        "cap": "delete_file",
+        "capture_output": false,
+        "fail_open": true,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
         }
       }
     ]
