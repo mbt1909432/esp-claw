@@ -1215,6 +1215,7 @@ static esp_err_t cap_im_wechat_save_attachment_buffer(const char *chat_id,
         .saved_at_ms = cap_im_wechat_now_ms(),
     });
     if (!payload_json) {
+        remove(saved_path);
         return ESP_ERR_NO_MEM;
     }
 
@@ -1224,6 +1225,9 @@ static esp_err_t cap_im_wechat_save_attachment_buffer(const char *chat_id,
                                                  content_type,
                                                  payload_json);
     free(payload_json);
+    if (err != ESP_OK) {
+        remove(saved_path);
+    }
     return err;
 }
 
