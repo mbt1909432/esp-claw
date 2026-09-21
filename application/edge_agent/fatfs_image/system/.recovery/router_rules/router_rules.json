@@ -112,6 +112,36 @@
     ]
   },
   {
+    "id": "im_image_attachment_inspect",
+    "description": "Analyze inbound image attachments with the local LLM vision capability.",
+    "enabled": true,
+    "consume_on_match": true,
+    "ack": "{{event.source_channel}} image analyzed",
+    "match": {
+      "event_type": "attachment_saved",
+      "content_type": "image/jpeg"
+    },
+    "actions": [
+      {
+        "type": "call_cap",
+        "cap": "inspect_image",
+        "capture_output": true,
+        "fail_open": true,
+        "input": {
+          "path": "{{event.payload.saved_path}}",
+          "prompt": "请分析这张图片，描述其中的物体、文字和可见细节。如果是硬件开发板，请尽可能判断芯片、板型、接口和指示灯；看不清的地方请明确说明。"
+        }
+      },
+      {
+        "type": "send_message",
+        "input": {
+          "channel": "{{event.source_channel}}",
+          "chat_id": "{{event.chat_id}}"
+        }
+      }
+    ]
+  },
+  {
     "id": "im_attachment_saved_reply",
     "description": "Reply when an IM attachment is saved.",
     "enabled": true,
