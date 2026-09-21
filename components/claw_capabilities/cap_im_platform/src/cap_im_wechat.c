@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -1352,6 +1353,26 @@ static const char *cap_im_wechat_item_file_name(cJSON *item)
     return cap_im_wechat_string_value(cJSON_GetObjectItemCaseSensitive(file_item, "file_name"));
 }
 
+static const char *cap_im_wechat_file_content_type(const char *file_name)
+{
+    const char *dot = NULL;
+
+    if (!file_name || !file_name[0]) {
+        return "application/octet-stream";
+    }
+    dot = strrchr(file_name, '.');
+    if (!dot || !dot[1]) {
+        return "application/octet-stream";
+    }
+    if (strcasecmp(dot, ".txt") == 0) {
+        return "text/plain";
+    }
+    if (strcasecmp(dot, ".md") == 0 || strcasecmp(dot, ".markdown") == 0) {
+        return "text/markdown";
+    }
+    return "application/octet-stream";
+}
+
 static esp_err_t cap_im_wechat_process_media_item(cJSON *item,
                                                   const char *chat_id,
                                                   const char *sender_id,
@@ -1386,8 +1407,8 @@ static esp_err_t cap_im_wechat_process_media_item(cJSON *item,
         break;
     case 4:
         kind = "file";
-        content_type = "application/octet-stream";
         file_name = cap_im_wechat_item_file_name(item);
+        content_type = cap_im_wechat_file_content_type(file_name);
         break;
     case 5:
         kind = "video";

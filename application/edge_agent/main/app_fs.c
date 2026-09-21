@@ -157,10 +157,11 @@ static esp_err_t recover_missing_files(const char *src_dir, const char *dst_dir)
     return result;
 }
 
-/* The inbox contains transient IM attachments. They are useful while an
+/* IM platform inboxes contain transient attachments. They are useful while an
  * attachment_saved event is being processed, but they are not user data and
  * must not survive a reboot. Runtime router rules remove files after handling;
- * this boot-time sweep covers power loss, timeouts, and old firmware rules. */
+ * this boot-time sweep covers power loss, timeouts, and old firmware rules.
+ * The separate /inbox/webim staging area is intentionally left alone. */
 static void cleanup_attachment_inbox_tree(const char *dir_path,
                                           size_t *removed_files,
                                           uint64_t *removed_bytes)
@@ -229,36 +230,49 @@ static void cleanup_attachment_inbox_tree(const char *dir_path,
 
 static void cleanup_attachment_inbox(void)
 {
-    char inbox_path[64];
-    struct stat st;
-    size_t removed_files = 0;
-    uint64_t removed_bytes = 0;
+    /* Keep /inbox/webim intact: the web UI uses it as a user-visible staging
+     * area for files selected before a message is sent. IM platform folders
+     * are transient download queues and can be safely swept after a reboot. */
+    static const char *const transient_platforms[] = {
+        "wechat",
+        "feishu",
+        "telegram",
+        "qq",
+    };
 
-    if (snprintf(inbox_path,
-                 sizeof(inbox_path),
-                 "%s/inbox",
-                 s_storage_base_path) >= (int)sizeof(inbox_path)) {
-        ESP_LOGW(TAG, "attachment inbox path too long");
-        return;
-    }
+    for (size_t i = 0; i < sizeof(transient_platforms) / sizeof(transient_platforms[0]); i++) {
+        char inbox_path[96];
+        struct stat st;
+        size_t removed_files = 0;
+        uint64_t removed_bytes = 0;
 
-    if (stat(inbox_path, &st) != 0) {
-        if (errno != ENOENT) {
-            ESP_LOGW(TAG, "attachment inbox stat failed: %s (%s)", inbox_path, strerror(errno));
+        if (snprintf(inbox_path,
+                     sizeof(inbox_path),
+                     "%s/inbox/%s",
+                     s_storage_base_path,
+                     transient_platforms[i]) >= (int)sizeof(inbox_path)) {
+            ESP_LOGW(TAG, "attachment inbox path too long for platform=%s", transient_platforms[i]);
+            continue;
         }
-        return;
-    }
-    if (!S_ISDIR(st.st_mode)) {
-        ESP_LOGW(TAG, "attachment inbox is not a directory: %s", inbox_path);
-        return;
-    }
 
-    cleanup_attachment_inbox_tree(inbox_path, &removed_files, &removed_bytes);
-    ESP_LOGI(TAG,
-             "attachment inbox cleanup: files=%u bytes=%u path=%s",
-             (unsigned)removed_files,
-             (unsigned)removed_bytes,
-             inbox_path);
+        if (stat(inbox_path, &st) != 0) {
+            if (errno != ENOENT) {
+                ESP_LOGW(TAG, "attachment inbox stat failed: %s (%s)", inbox_path, strerror(errno));
+            }
+            continue;
+        }
+        if (!S_ISDIR(st.st_mode)) {
+            ESP_LOGW(TAG, "attachment inbox is not a directory: %s", inbox_path);
+            continue;
+        }
+
+        cleanup_attachment_inbox_tree(inbox_path, &removed_files, &removed_bytes);
+        ESP_LOGI(TAG,
+                 "attachment inbox cleanup: files=%u bytes=%u path=%s",
+                 (unsigned)removed_files,
+                 (unsigned)removed_bytes,
+                 inbox_path);
+    }
 }
 
 #if defined(CONFIG_ESP_BOARD_DEV_FS_FAT_SUPPORT)

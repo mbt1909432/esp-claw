@@ -126,7 +126,7 @@
         "type": "call_cap",
         "cap": "inspect_image",
         "capture_output": true,
-        "fail_open": true,
+        "fail_open": false,
         "input": {
           "path": "{{event.payload.saved_path}}",
           "prompt": "请分析这张图片，描述其中的物体、文字和可见细节。如果是硬件开发板，请尽可能判断芯片、板型、接口和指示灯；看不清的地方请明确说明。"
@@ -134,7 +134,85 @@
       },
       {
         "type": "send_message",
+        "fail_open": false,
+        "input": {
+          "channel": "{{event.source_channel}}",
+          "chat_id": "{{event.chat_id}}"
+        }
+      },
+      {
+        "type": "call_cap",
+        "cap": "delete_file",
+        "capture_output": false,
         "fail_open": true,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "im_text_attachment_read",
+    "description": "Read inbound UTF-8 text attachments and send their contents.",
+    "enabled": true,
+    "consume_on_match": true,
+    "ack": "{{event.source_channel}} text file read",
+    "match": {
+      "event_type": "attachment_saved",
+      "content_type": "text/plain"
+    },
+    "actions": [
+      {
+        "type": "call_cap",
+        "cap": "read_file",
+        "capture_output": true,
+        "fail_open": false,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
+        }
+      },
+      {
+        "type": "send_message",
+        "fail_open": false,
+        "input": {
+          "channel": "{{event.source_channel}}",
+          "chat_id": "{{event.chat_id}}"
+        }
+      },
+      {
+        "type": "call_cap",
+        "cap": "delete_file",
+        "capture_output": false,
+        "fail_open": true,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "im_markdown_attachment_read",
+    "description": "Read inbound Markdown attachments and send their contents.",
+    "enabled": true,
+    "consume_on_match": true,
+    "ack": "{{event.source_channel}} markdown file read",
+    "match": {
+      "event_type": "attachment_saved",
+      "content_type": "text/markdown"
+    },
+    "actions": [
+      {
+        "type": "call_cap",
+        "cap": "read_file",
+        "capture_output": true,
+        "fail_open": false,
+        "input": {
+          "path": "{{event.payload.saved_path}}"
+        }
+      },
+      {
+        "type": "send_message",
+        "fail_open": false,
         "input": {
           "channel": "{{event.source_channel}}",
           "chat_id": "{{event.chat_id}}"

@@ -54,6 +54,28 @@ static const char *TAG = "app_claw";
 static const char *APP_STARTUP_EVENT_SOURCE_CAP = "app_claw";
 static const char *APP_STARTUP_EVENT_TYPE = "startup";
 static const char *APP_STARTUP_EVENT_KEY = "boot_completed";
+
+/* Rules are seeded into /system/.recovery for new devices. Existing devices
+ * keep their writable rules file, so add these built-ins once at startup when
+ * an older rules file does not contain them yet. User-defined rules are left
+ * untouched. */
+static const char *const APP_BUILTIN_ATTACHMENT_RULES[] = {
+    "{\"id\":\"im_image_attachment_inspect\",\"description\":\"Analyze inbound image attachments with the local LLM vision capability.\",\"enabled\":true,\"consume_on_match\":true,\"ack\":\"{{event.source_channel}} image analyzed\",\"match\":{\"event_type\":\"attachment_saved\",\"content_type\":\"image/jpeg\"},\"actions\":[{\"type\":\"call_cap\",\"cap\":\"inspect_image\",\"capture_output\":true,\"fail_open\":false,\"input\":{\"path\":\"{{event.payload.saved_path}}\",\"prompt\":\"请分析这张图片，描述其中的物体、文字和可见细节。如果是硬件开发板，请尽可能判断芯片、板型、接口和指示灯；看不清的地方请明确说明。\"}},{\"type\":\"send_message\",\"fail_open\":false,\"input\":{\"channel\":\"{{event.source_channel}}\",\"chat_id\":\"{{event.chat_id}}\"}},{\"type\":\"call_cap\",\"cap\":\"delete_file\",\"capture_output\":false,\"fail_open\":true,\"input\":{\"path\":\"{{event.payload.saved_path}}\"}}]}",
+    "{\"id\":\"im_text_attachment_read\",\"description\":\"Read inbound UTF-8 text attachments and send their contents.\",\"enabled\":true,\"consume_on_match\":true,\"ack\":\"{{event.source_channel}} text file read\",\"match\":{\"event_type\":\"attachment_saved\",\"content_type\":\"text/plain\"},\"actions\":[{\"type\":\"call_cap\",\"cap\":\"read_file\",\"capture_output\":true,\"fail_open\":false,\"input\":{\"path\":\"{{event.payload.saved_path}}\"}},{\"type\":\"send_message\",\"fail_open\":false,\"input\":{\"channel\":\"{{event.source_channel}}\",\"chat_id\":\"{{event.chat_id}}\"}},{\"type\":\"call_cap\",\"cap\":\"delete_file\",\"capture_output\":false,\"fail_open\":true,\"input\":{\"path\":\"{{event.payload.saved_path}}\"}}]}",
+    "{\"id\":\"im_markdown_attachment_read\",\"description\":\"Read inbound Markdown attachments and send their contents.\",\"enabled\":true,\"consume_on_match\":true,\"ack\":\"{{event.source_channel}} markdown file read\",\"match\":{\"event_type\":\"attachment_saved\",\"content_type\":\"text/markdown\"},\"actions\":[{\"type\":\"call_cap\",\"cap\":\"read_file\",\"capture_output\":true,\"fail_open\":false,\"input\":{\"path\":\"{{event.payload.saved_path}}\"}},{\"type\":\"send_message\",\"fail_open\":false,\"input\":{\"channel\":\"{{event.source_channel}}\",\"chat_id\":\"{{event.chat_id}}\"}},{\"type\":\"call_cap\",\"cap\":\"delete_file\",\"capture_output\":false,\"fail_open\":true,\"input\":{\"path\":\"{{event.payload.saved_path}}\"}}]}"
+};
+
+static void app_claw_ensure_builtin_attachment_rules(void)
+{
+    for (size_t i = 0; i < sizeof(APP_BUILTIN_ATTACHMENT_RULES) / sizeof(APP_BUILTIN_ATTACHMENT_RULES[0]); i++) {
+        esp_err_t err = claw_event_router_add_rule_json(APP_BUILTIN_ATTACHMENT_RULES[i]);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "Could not install built-in attachment rule %u: %s",
+                     (unsigned)i,
+                     esp_err_to_name(err));
+        }
+    }
+}
 #endif
 
 #define APP_SYSTEM_PROMPT_COMMON \
@@ -726,6 +748,7 @@ esp_err_t app_claw_start(const app_claw_config_t *config)
 
 #if CONFIG_APP_CLAW_CAP_EVENT_ROUTER
     ESP_RETURN_ON_ERROR(claw_event_router_init(&router_config), TAG, "Failed to init event router");
+    app_claw_ensure_builtin_attachment_rules();
 #endif
 
 #if CONFIG_APP_CLAW_CAP_SCHEDULER
