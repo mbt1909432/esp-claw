@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include "ramfs.h"
 #include "wear_levelling.h"
@@ -156,6 +157,110 @@ static esp_err_t recover_missing_files(const char *src_dir, const char *dst_dir)
     return result;
 }
 
+/* The inbox contains transient IM attachments. They are useful while an
+ * attachment_saved event is being processed, but they are not user data and
+ * must not survive a reboot. Runtime router rules remove files after handling;
+ * this boot-time sweep covers power loss, timeouts, and old firmware rules. */
+static void cleanup_attachment_inbox_tree(const char *dir_path,
+                                          size_t *removed_files,
+                                          uint64_t *removed_bytes)
+{
+    DIR *dir = NULL;
+    struct dirent *entry;
+
+    if (!dir_path || !removed_files || !removed_bytes) {
+        return;
+    }
+
+    dir = opendir(dir_path);
+    if (!dir) {
+        ESP_LOGW(TAG, "cannot scan attachment inbox %s: %s", dir_path, strerror(errno));
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        char child_path[256];
+        struct stat st;
+
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        if (snprintf(child_path,
+                     sizeof(child_path),
+                     "%s/%s",
+                     dir_path,
+                     entry->d_name) >= (int)sizeof(child_path)) {
+            ESP_LOGW(TAG, "attachment inbox path too long, skipping %s/%s", dir_path, entry->d_name);
+            continue;
+        }
+
+        if (lstat(child_path, &st) != 0) {
+            ESP_LOGW(TAG, "attachment inbox stat failed: %s (%s)", child_path, strerror(errno));
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            cleanup_attachment_inbox_tree(child_path, removed_files, removed_bytes);
+            if (rmdir(child_path) != 0 && errno != ENOENT) {
+                ESP_LOGW(TAG, "attachment inbox rmdir failed: %s (%s)", child_path, strerror(errno));
+            }
+            continue;
+        }
+
+        if (!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
+            ESP_LOGW(TAG, "attachment inbox skipping special file: %s", child_path);
+            continue;
+        }
+
+        if (unlink(child_path) != 0) {
+            ESP_LOGW(TAG, "attachment inbox delete failed: %s (%s)", child_path, strerror(errno));
+            continue;
+        }
+
+        (*removed_files)++;
+        if (S_ISREG(st.st_mode)) {
+            *removed_bytes += (uint64_t)st.st_size;
+        }
+    }
+
+    closedir(dir);
+}
+
+static void cleanup_attachment_inbox(void)
+{
+    char inbox_path[64];
+    struct stat st;
+    size_t removed_files = 0;
+    uint64_t removed_bytes = 0;
+
+    if (snprintf(inbox_path,
+                 sizeof(inbox_path),
+                 "%s/inbox",
+                 s_storage_base_path) >= (int)sizeof(inbox_path)) {
+        ESP_LOGW(TAG, "attachment inbox path too long");
+        return;
+    }
+
+    if (stat(inbox_path, &st) != 0) {
+        if (errno != ENOENT) {
+            ESP_LOGW(TAG, "attachment inbox stat failed: %s (%s)", inbox_path, strerror(errno));
+        }
+        return;
+    }
+    if (!S_ISDIR(st.st_mode)) {
+        ESP_LOGW(TAG, "attachment inbox is not a directory: %s", inbox_path);
+        return;
+    }
+
+    cleanup_attachment_inbox_tree(inbox_path, &removed_files, &removed_bytes);
+    ESP_LOGI(TAG,
+             "attachment inbox cleanup: files=%u bytes=%u path=%s",
+             (unsigned)removed_files,
+             (unsigned)removed_bytes,
+             inbox_path);
+}
+
 #if defined(CONFIG_ESP_BOARD_DEV_FS_FAT_SUPPORT)
 // Return the mount point of the SD card that the board manager mounted, or NULL
 // when there is no usable SD card. The mount point is taken from the device
@@ -215,6 +320,7 @@ static esp_err_t app_fs_init_storage(void)
         if (rec != ESP_OK) {
             ESP_LOGW(TAG, "Recovery into SD card incomplete: %s", esp_err_to_name(rec));
         }
+        cleanup_attachment_inbox();
         log_fatfs_info(s_storage_base_path);
         return ESP_OK;
     }
@@ -247,6 +353,7 @@ static esp_err_t app_fs_init_storage(void)
         ESP_LOGW(TAG, "Recovery into flash fatfs incomplete: %s", esp_err_to_name(rec));
     }
 
+    cleanup_attachment_inbox();
     log_fatfs_info(s_storage_base_path);
     return ESP_OK;
 }
