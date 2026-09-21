@@ -81,6 +81,12 @@ esp_err_t app_claw_apply_config(const app_claw_config_t *config);
 claw_core_handle_t app_claw_get_core(void);
 esp_err_t app_claw_ui_start(void);
 esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid);
+esp_err_t app_claw_get_session_history(const char *source_channel,
+                                       const char *chat_id,
+                                       char **out_json);
+esp_err_t app_claw_delete_session_history(const char *source_channel,
+                                          const char *chat_id,
+                                          bool *out_deleted_any);
 
 #ifdef __cplusplus
 }

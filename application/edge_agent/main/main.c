@@ -232,6 +232,20 @@ static esp_err_t main_scan_wifi(http_server_wifi_scan_record_t *records,
     return err;
 }
 
+static esp_err_t main_get_webim_history(const char *channel,
+                                        const char *chat_id,
+                                        char **out_json)
+{
+    return app_claw_get_session_history(channel, chat_id, out_json);
+}
+
+static esp_err_t main_delete_webim_history(const char *channel,
+                                           const char *chat_id,
+                                           bool *out_deleted_any)
+{
+    return app_claw_delete_session_history(channel, chat_id, out_deleted_any);
+}
+
 static void main_restart_task(void *arg)
 {
     (void)arg;
@@ -394,6 +408,8 @@ void app_main(void)
             .save_config = main_save_config,
             .get_wifi_status = main_get_wifi_status,
             .scan_wifi = main_scan_wifi,
+            .get_webim_history = main_get_webim_history,
+            .delete_webim_history = main_delete_webim_history,
             .restart_device = main_restart_device,
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
             .wechat_login_start = main_wechat_login_start,

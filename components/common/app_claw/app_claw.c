@@ -607,6 +607,79 @@ esp_err_t app_claw_set_network_status(bool sta_connected, const char *ap_ssid)
 #endif
 }
 
+static esp_err_t app_claw_build_session_id(const char *source_channel,
+                                            const char *chat_id,
+                                            char *session_id,
+                                            size_t session_id_size)
+{
+#if CONFIG_APP_CLAW_CAP_SESSION_MGR
+    claw_session_build_context_t context = {
+        .agent_id = 0,
+        .session_policy = CLAW_SESSION_POLICY_CHAT,
+        .source_channel = source_channel,
+        .chat_id = chat_id,
+    };
+    size_t session_len = 0;
+    esp_err_t err = claw_session_mgr_build_session_id(&context,
+                                                      session_id,
+                                                      session_id_size,
+                                                      &session_len);
+    return err == ESP_OK && session_len > 0 ? ESP_OK : (err == ESP_OK ? ESP_ERR_NOT_FOUND : err);
+#else
+    (void)source_channel;
+    (void)chat_id;
+    (void)session_id;
+    (void)session_id_size;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t app_claw_get_session_history(const char *source_channel,
+                                       const char *chat_id,
+                                       char **out_json)
+{
+#if CONFIG_APP_CLAW_CAP_SESSION_MGR && CONFIG_APP_CLAW_CAP_MEMORY
+    char session_id[CLAW_SESSION_MGR_ID_SIZE] = {0};
+
+    if (!out_json || !source_channel || !source_channel[0] || !chat_id || !chat_id[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *out_json = NULL;
+    ESP_RETURN_ON_ERROR(app_claw_build_session_id(source_channel, chat_id, session_id, sizeof(session_id)),
+                        TAG,
+                        "Failed to build session id");
+    return claw_memory_get_session_history(session_id, out_json);
+#else
+    (void)source_channel;
+    (void)chat_id;
+    (void)out_json;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t app_claw_delete_session_history(const char *source_channel,
+                                          const char *chat_id,
+                                          bool *out_deleted_any)
+{
+#if CONFIG_APP_CLAW_CAP_SESSION_MGR && CONFIG_APP_CLAW_CAP_MEMORY
+    char session_id[CLAW_SESSION_MGR_ID_SIZE] = {0};
+
+    if (!out_deleted_any || !source_channel || !source_channel[0] || !chat_id || !chat_id[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *out_deleted_any = false;
+    ESP_RETURN_ON_ERROR(app_claw_build_session_id(source_channel, chat_id, session_id, sizeof(session_id)),
+                        TAG,
+                        "Failed to build session id");
+    return claw_memory_delete_session_history(session_id, out_deleted_any);
+#else
+    (void)source_channel;
+    (void)chat_id;
+    (void)out_deleted_any;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
 #if CONFIG_APP_CLAW_CAP_MEMORY
 
 static bool app_claw_bool_is_true(const char *value)

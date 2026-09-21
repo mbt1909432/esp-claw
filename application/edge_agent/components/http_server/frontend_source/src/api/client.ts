@@ -447,6 +447,7 @@ export type WebImMessage = {
   role: string;
   text: string;
   ts_ms?: number;
+  message_id?: string;
   links?: WebImLink[];
 };
 
@@ -460,6 +461,23 @@ export async function fetchWebimStatus() {
     '/api/webim/status',
     undefined,
     'Failed to read Web IM status',
+  );
+}
+
+export async function fetchWebimHistory(chatId: string) {
+  const data = await request<{ items?: Array<Record<string, unknown>> }>(
+    '/api/webim/history?chat_id=' + encodeURIComponent(chatId),
+    undefined,
+    'Failed to load Web IM history',
+  );
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+export async function deleteWebimHistory(chatId: string) {
+  return request<{ ok?: boolean; deleted?: boolean }>(
+    '/api/webim/history?chat_id=' + encodeURIComponent(chatId),
+    { method: 'DELETE' },
+    'Failed to delete Web IM history',
   );
 }
 

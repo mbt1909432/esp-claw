@@ -53,6 +53,12 @@ typedef struct {
     esp_err_t (*scan_wifi)(http_server_wifi_scan_record_t *records,
                            uint16_t max_records,
                            uint16_t *out_count);
+    esp_err_t (*get_webim_history)(const char *channel,
+                                   const char *chat_id,
+                                   char **out_json);
+    esp_err_t (*delete_webim_history)(const char *channel,
+                                      const char *chat_id,
+                                      bool *out_deleted_any);
     esp_err_t (*restart_device)(void);
     esp_err_t (*wechat_login_start)(const char *account_id, bool force);
     esp_err_t (*wechat_login_get_status)(http_server_wechat_login_status_t *status);

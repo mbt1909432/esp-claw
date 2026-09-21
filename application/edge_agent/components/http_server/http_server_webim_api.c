@@ -221,6 +221,7 @@ static esp_err_t webim_emit_outbound_json(const cap_im_local_message_t *message)
     s_evt_seq++;
     cJSON_AddNumberToObject(root, "seq", (double)s_evt_seq);
     http_server_json_add_string(root, "chat_id", message->chat_id ? message->chat_id : "");
+    http_server_json_add_string(root, "message_id", message->message_id ? message->message_id : "");
     http_server_json_add_string(root, "role", "assistant");
     http_server_json_add_string(root, "text", message->text ? message->text : "");
     cJSON_AddNumberToObject(root, "ts_ms", (double)(esp_timer_get_time() / 1000LL));
@@ -307,6 +308,78 @@ static esp_err_t webim_status_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(root, "ok", true);
     cJSON_AddBoolToObject(root, "bound", s_webim_bound);
     return http_server_send_json_response(req, root);
+}
+
+static esp_err_t webim_history_handler(httpd_req_t *req)
+{
+    http_server_ctx_t *ctx = http_server_ctx();
+    char chat_id[WEBIM_CHAT_ID_MAX] = {0};
+    char *history_json = NULL;
+    cJSON *root = NULL;
+    cJSON *items = NULL;
+    esp_err_t err;
+
+    if (!ctx->services.get_webim_history) {
+        return httpd_resp_send_err(req, HTTPD_501_NOT_IMPLEMENTED, "Web IM history is unavailable");
+    }
+    if (http_server_query_get(req, "chat_id", chat_id, sizeof(chat_id)) != ESP_OK || !chat_id[0]) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing chat_id");
+    }
+
+    err = ctx->services.get_webim_history(WEB_IM_CHANNEL, chat_id, &history_json);
+    if (err == ESP_ERR_NOT_FOUND) {
+        history_json = strdup("[]");
+        err = history_json ? ESP_OK : ESP_ERR_NO_MEM;
+    }
+    if (err != ESP_OK || !history_json) {
+        free(history_json);
+        return httpd_resp_send_err(req,
+                                   err == ESP_ERR_NOT_SUPPORTED ? HTTPD_501_NOT_IMPLEMENTED : HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Failed to load Web IM history");
+    }
+
+    items = cJSON_Parse(history_json);
+    free(history_json);
+    if (!items || !cJSON_IsArray(items)) {
+        cJSON_Delete(items);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid Web IM history");
+    }
+
+    root = cJSON_CreateObject();
+    if (!root) {
+        cJSON_Delete(items);
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddItemToObject(root, "items", items);
+    cJSON_AddNumberToObject(root, "count", cJSON_GetArraySize(items));
+    return http_server_send_json_response(req, root);
+}
+
+static esp_err_t webim_history_delete_handler(httpd_req_t *req)
+{
+    http_server_ctx_t *ctx = http_server_ctx();
+    char chat_id[WEBIM_CHAT_ID_MAX] = {0};
+    bool deleted_any = false;
+    esp_err_t err;
+
+    if (!ctx->services.delete_webim_history) {
+        return httpd_resp_send_err(req, HTTPD_501_NOT_IMPLEMENTED, "Web IM history deletion is unavailable");
+    }
+    if (http_server_query_get(req, "chat_id", chat_id, sizeof(chat_id)) != ESP_OK || !chat_id[0]) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing chat_id");
+    }
+
+    err = ctx->services.delete_webim_history(WEB_IM_CHANNEL, chat_id, &deleted_any);
+    if (err != ESP_OK) {
+        return httpd_resp_send_err(req,
+                                   err == ESP_ERR_NOT_SUPPORTED ? HTTPD_501_NOT_IMPLEMENTED : HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Failed to delete Web IM history");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
+    return httpd_resp_sendstr(req, deleted_any ? "{\"ok\":true,\"deleted\":true}" : "{\"ok\":true,\"deleted\":false}");
 }
 
 static esp_err_t webim_send_handler(httpd_req_t *req)
@@ -446,6 +519,8 @@ esp_err_t http_server_register_webim_routes(httpd_handle_t server)
 {
     const httpd_uri_t handlers[] = {
         { .uri = "/api/webim/status", .method = HTTP_GET, .handler = webim_status_handler },
+        { .uri = "/api/webim/history", .method = HTTP_GET, .handler = webim_history_handler },
+        { .uri = "/api/webim/history", .method = HTTP_DELETE, .handler = webim_history_delete_handler },
         { .uri = "/api/webim/send", .method = HTTP_POST, .handler = webim_send_handler },
         {
             .uri = "/ws/webim",
