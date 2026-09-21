@@ -86,7 +86,13 @@ export const zhCn: Dict = {
 
   sectionWifi: 'Wi-Fi 设置',
   wifiSsid: 'Wi-Fi 名称 (SSID)',
+  wifiSsidHint: '由 ESP32 扫描附近热点，点击列表中的网络即可填写名称。',
   wifiPassword: 'Wi-Fi 密码',
+  wifiScan: '扫描附近 Wi-Fi',
+  wifiScanning: '扫描中…',
+  wifiScanResults: '附近的 Wi-Fi',
+  wifiScanEmpty: '没有找到可显示名称的 Wi-Fi。',
+  wifiScanFailed: '扫描附近 Wi-Fi 失败。',
   passwordShow: '显示密码',
   passwordHide: '隐藏密码',
   wifiValidationSsidRequired: 'Wi-Fi 名称不能为空。',

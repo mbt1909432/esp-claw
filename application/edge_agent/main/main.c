@@ -186,6 +186,52 @@ static esp_err_t main_get_wifi_status(http_server_wifi_status_t *status)
     return ESP_OK;
 }
 
+static const char *main_wifi_auth_to_string(wifi_auth_mode_t authmode)
+{
+    switch (authmode) {
+    case WIFI_AUTH_OPEN:            return "open";
+    case WIFI_AUTH_WEP:             return "wep";
+    case WIFI_AUTH_WPA_PSK:         return "wpa_psk";
+    case WIFI_AUTH_WPA2_PSK:        return "wpa2_psk";
+    case WIFI_AUTH_WPA_WPA2_PSK:    return "wpa_wpa2_psk";
+    case WIFI_AUTH_WPA2_ENTERPRISE: return "wpa2_enterprise";
+    case WIFI_AUTH_WPA3_PSK:        return "wpa3_psk";
+    case WIFI_AUTH_WPA2_WPA3_PSK:   return "wpa2_wpa3_psk";
+    case WIFI_AUTH_WAPI_PSK:        return "wapi_psk";
+    default:                        return "unknown";
+    }
+}
+
+static esp_err_t main_scan_wifi(http_server_wifi_scan_record_t *records,
+                                uint16_t max_records,
+                                uint16_t *out_count)
+{
+    wifi_manager_scan_record_t *scan_records = NULL;
+    esp_err_t err;
+
+    if (!records || max_records == 0 || !out_count) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    scan_records = calloc(max_records, sizeof(*scan_records));
+    if (!scan_records) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = wifi_manager_scan_aps(scan_records, max_records, out_count);
+    if (err == ESP_OK) {
+        for (uint16_t i = 0; i < *out_count; i++) {
+            strlcpy(records[i].ssid, scan_records[i].ssid, sizeof(records[i].ssid));
+            records[i].rssi = scan_records[i].rssi;
+            records[i].primary = scan_records[i].primary;
+            strlcpy(records[i].auth,
+                    main_wifi_auth_to_string(scan_records[i].authmode),
+                    sizeof(records[i].auth));
+        }
+    }
+    free(scan_records);
+    return err;
+}
+
 static void main_restart_task(void *arg)
 {
     (void)arg;
@@ -347,6 +393,7 @@ void app_main(void)
             .load_config = main_load_config,
             .save_config = main_save_config,
             .get_wifi_status = main_get_wifi_status,
+            .scan_wifi = main_scan_wifi,
             .restart_device = main_restart_device,
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
             .wechat_login_start = main_wechat_login_start,

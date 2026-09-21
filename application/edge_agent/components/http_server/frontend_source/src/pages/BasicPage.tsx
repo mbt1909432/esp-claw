@@ -1,6 +1,6 @@
-import { createEffect, createSignal, Show, type Component } from 'solid-js';
+import { createEffect, createSignal, For, Show, type Component } from 'solid-js';
 import { currentLocale, t, tf } from '../i18n';
-import type { AppConfig } from '../api/client';
+import { scanWifi, type AppConfig, type WifiScanItem } from '../api/client';
 import { createConfigTab } from '../state/configTab';
 import { appStatus } from '../state/config';
 import { TabShell } from '../components/layout/TabShell';
@@ -11,6 +11,7 @@ import { SavePanel } from '../components/ui/SavePanel';
 import { Banner } from '../components/ui/Banner';
 import { RestartConfirmModal } from '../components/system/RestartConfirmModal';
 import { pushToast } from '../state/toast';
+import { Button } from '../components/ui/Button';
 
 type BasicForm = {
   wifi_ssid: string;
@@ -44,6 +45,9 @@ export const BasicPage: Component<{ onRestartRequest: () => void }> = (props) =>
   });
   const [validationError, setValidationError] = createSignal<string | null>(null);
   const [confirmOpen, setConfirmOpen] = createSignal(false);
+  const [wifiScanItems, setWifiScanItems] = createSignal<WifiScanItem[]>([]);
+  const [wifiScanning, setWifiScanning] = createSignal(false);
+  const [wifiScanError, setWifiScanError] = createSignal<string | null>(null);
 
   createEffect(() => {
     void tab.form.wifi_ssid;
@@ -85,6 +89,35 @@ export const BasicPage: Component<{ onRestartRequest: () => void }> = (props) =>
 
   const currentApSsid = () => appStatus()?.ap_ssid ?? '';
 
+  const handleWifiScan = async () => {
+    if (wifiScanning()) return;
+    setWifiScanning(true);
+    setWifiScanError(null);
+    try {
+      const items = await scanWifi();
+      const unique = new Map<string, WifiScanItem>();
+      for (const item of items) {
+        if (!item.ssid.trim()) continue;
+        const current = unique.get(item.ssid);
+        if (!current || item.rssi > current.rssi) {
+          unique.set(item.ssid, item);
+        }
+      }
+      setWifiScanItems(
+        Array.from(unique.values()).sort((a, b) => b.rssi - a.rssi),
+      );
+      if (unique.size === 0) {
+        setWifiScanError(t('wifiScanEmpty') as string);
+      }
+    } catch (err) {
+      const message = (err as Error).message || (t('wifiScanFailed') as string);
+      setWifiScanError(message);
+      pushToast(message, 'error', 5000);
+    } finally {
+      setWifiScanning(false);
+    }
+  };
+
   const apNameHint = () => {
     const ssid = currentApSsid();
     return ssid ? tf('apNameHint', { ssid }) : '';
@@ -120,12 +153,24 @@ export const BasicPage: Component<{ onRestartRequest: () => void }> = (props) =>
       <div class="divide-y divide-[var(--color-border-subtle)] mt-2">
         <StaticConfigBlock title={t('sectionWifi') as string}>
           <div class="grid gap-3 sm:grid-cols-2 pt-2">
-            <TextInput
-              label={t('wifiSsid')}
-              autocomplete="off"
-              value={tab.form.wifi_ssid}
-              onInput={(event) => tab.setForm('wifi_ssid', event.currentTarget.value)}
-            />
+            <div class="flex flex-col gap-2">
+              <TextInput
+                label={t('wifiSsid')}
+                autocomplete="off"
+                hint={t('wifiSsidHint') as string}
+                value={tab.form.wifi_ssid}
+                onInput={(event) => tab.setForm('wifi_ssid', event.currentTarget.value)}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                class="self-start"
+                disabled={wifiScanning()}
+                onClick={() => void handleWifiScan()}
+              >
+                {wifiScanning() ? t('wifiScanning') : t('wifiScan')}
+              </Button>
+            </div>
             <TextInput
               type="password"
               label={t('wifiPassword')}
@@ -157,6 +202,34 @@ export const BasicPage: Component<{ onRestartRequest: () => void }> = (props) =>
               <option value="close_on_sta">{t('apBehaviorCloseOnSta') as string}</option>
             </SelectInput>
           </div>
+          <Show when={wifiScanError()}>
+            <div class="mt-3 text-[0.78rem] text-[var(--color-orange)]">{wifiScanError()}</div>
+          </Show>
+          <Show when={wifiScanItems().length > 0}>
+            <div class="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-white/[0.02] overflow-hidden">
+              <div class="px-3 py-2 text-[0.76rem] text-[var(--color-text-muted)] border-b border-[var(--color-border-subtle)]">
+                {t('wifiScanResults')}
+              </div>
+              <div class="divide-y divide-[var(--color-border-subtle)] max-h-60 overflow-auto">
+                <For each={wifiScanItems()}>
+                  {(item) => (
+                    <button
+                      type="button"
+                      class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/[0.05] transition"
+                      onClick={() => tab.setForm('wifi_ssid', item.ssid)}
+                    >
+                      <span class="min-w-0 flex-1 truncate text-sm text-[var(--color-text-primary)]">
+                        {item.ssid}
+                      </span>
+                      <span class="shrink-0 text-[0.72rem] text-[var(--color-text-muted)]">
+                        {item.rssi} dBm · CH {item.channel} · {item.auth}
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
         </StaticConfigBlock>
         <CollapsibleConfigBlock title={t('sectionAdvanced') as string} defaultOpen={false}>
           <div class="pt-2">

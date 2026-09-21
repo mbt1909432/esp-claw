@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "app_config.h"
 #include "esp_err.h"
@@ -22,6 +23,13 @@ typedef struct {
     const char *ap_ip;
     const char *wifi_mode;
 } http_server_wifi_status_t;
+
+typedef struct {
+    char ssid[33];
+    int8_t rssi;
+    uint8_t primary;
+    char auth[24];
+} http_server_wifi_scan_record_t;
 
 typedef struct {
     bool active;
@@ -42,6 +50,9 @@ typedef struct {
     esp_err_t (*load_config)(app_config_t *config);
     esp_err_t (*save_config)(const app_config_t *config);
     esp_err_t (*get_wifi_status)(http_server_wifi_status_t *status);
+    esp_err_t (*scan_wifi)(http_server_wifi_scan_record_t *records,
+                           uint16_t max_records,
+                           uint16_t *out_count);
     esp_err_t (*restart_device)(void);
     esp_err_t (*wechat_login_start)(const char *account_id, bool force);
     esp_err_t (*wechat_login_get_status)(http_server_wechat_login_status_t *status);

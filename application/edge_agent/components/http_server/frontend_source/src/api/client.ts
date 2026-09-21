@@ -113,6 +113,13 @@ export type StatusInfo = {
   storage_base_path: string;
 };
 
+export type WifiScanItem = {
+  ssid: string;
+  rssi: number;
+  channel: number;
+  auth: string;
+};
+
 export type CapabilityItem = {
   group_id: string;
   display_name: string;
@@ -190,6 +197,11 @@ async function request<T>(
 
 export function fetchStatus(signal?: AbortSignal) {
   return request<StatusInfo>('/api/status', { signal }, 'Failed to load status');
+}
+
+export async function scanWifi() {
+  const data = await request<{ items?: WifiScanItem[] }>('/api/wifi/scan', undefined, 'Failed to scan nearby Wi-Fi');
+  return Array.isArray(data.items) ? data.items.filter((item) => item.ssid) : [];
 }
 
 /** Fetch a subset of the configuration, filtered by group names. */

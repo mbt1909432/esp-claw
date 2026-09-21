@@ -86,7 +86,13 @@ export const en = {
 
   sectionWifi: 'Wi-Fi Settings',
   wifiSsid: 'Wi-Fi SSID',
+  wifiSsidHint: 'Scan from the ESP32, then click a nearby network to fill this field.',
   wifiPassword: 'Wi-Fi Password',
+  wifiScan: 'Scan nearby Wi-Fi',
+  wifiScanning: 'Scanning…',
+  wifiScanResults: 'Nearby networks',
+  wifiScanEmpty: 'No named networks were found.',
+  wifiScanFailed: 'Could not scan nearby Wi-Fi.',
   passwordShow: 'Show password',
   passwordHide: 'Hide password',
   wifiValidationSsidRequired: 'Wi-Fi SSID is required.',
