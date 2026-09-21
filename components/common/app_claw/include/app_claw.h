@@ -20,6 +20,10 @@ extern "C" {
 #define APP_CLAW_TIMEOUT_LEN          16
 #define APP_CLAW_PATH_LEN             64
 #define APP_CLAW_FILE_PATH_LEN        96
+#define APP_CLAW_AGENT_NAME_LEN       48
+#define APP_CLAW_OWNER_NAME_LEN       64
+#define APP_CLAW_PERSONA_ID_LEN       32
+#define APP_CLAW_PERSONA_PROMPT_LEN   1024
 
 typedef struct claw_core_state *claw_core_handle_t;
 
@@ -58,6 +62,11 @@ typedef struct {
     char enabled_cap_groups[APP_CLAW_STR_LEN];
     char llm_visible_cap_groups[APP_CLAW_STR_LEN];
     char enabled_lua_modules[APP_CLAW_STR_LEN];
+    char agent_display_name[APP_CLAW_AGENT_NAME_LEN];
+    char agent_owner_name[APP_CLAW_OWNER_NAME_LEN];
+    char agent_owner_address[APP_CLAW_AGENT_NAME_LEN];
+    char agent_persona_id[APP_CLAW_PERSONA_ID_LEN];
+    char agent_custom_prompt[APP_CLAW_PERSONA_PROMPT_LEN];
 } app_claw_config_t;
 
 typedef esp_err_t (*app_claw_save_config_fn)(const app_claw_config_t *config,

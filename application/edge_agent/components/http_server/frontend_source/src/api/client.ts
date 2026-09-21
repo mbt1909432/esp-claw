@@ -39,11 +39,24 @@ export type AppConfig = {
   llm_visible_cap_groups: string;
   enabled_lua_modules: string;
   time_timezone: string;
+  agent_display_name: string;
+  agent_owner_name: string;
+  agent_owner_address: string;
+  agent_persona_id: string;
+  agent_custom_prompt: string;
 };
 
 /** Server-side configuration groups (must stay in sync with
  * CONFIG_FIELDS in http_server_config_api.c). */
-export type ConfigGroup = 'wifi' | 'llm' | 'im' | 'search' | 'capabilities' | 'skills' | 'time';
+export type ConfigGroup =
+  | 'wifi'
+  | 'llm'
+  | 'im'
+  | 'search'
+  | 'capabilities'
+  | 'skills'
+  | 'time'
+  | 'agent';
 
 export const GROUP_FIELDS: Record<ConfigGroup, (keyof AppConfig)[]> = {
   wifi: ['wifi_ssid', 'wifi_password', 'ap_ssid', 'ap_password', 'ap_behavior'],
@@ -77,6 +90,13 @@ export const GROUP_FIELDS: Record<ConfigGroup, (keyof AppConfig)[]> = {
   capabilities: ['enabled_cap_groups', 'llm_visible_cap_groups'],
   skills: ['enabled_lua_modules'],
   time: ['time_timezone'],
+  agent: [
+    'agent_display_name',
+    'agent_owner_name',
+    'agent_owner_address',
+    'agent_persona_id',
+    'agent_custom_prompt',
+  ],
 };
 
 export function blankConfig(): Partial<AppConfig> {

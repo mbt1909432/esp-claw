@@ -61,6 +61,11 @@ typedef struct {
 #define APP_DEFAULT_LLM_VISIBLE_CAP_GROUPS   ""
 #define APP_DEFAULT_ENABLED_LUA_MODULES      ""
 #define APP_DEFAULT_TIME_TIMEZONE            "CST-8"
+#define APP_DEFAULT_AGENT_DISPLAY_NAME       "Nova"
+#define APP_DEFAULT_AGENT_OWNER_NAME         "Elon Xu"
+#define APP_DEFAULT_AGENT_OWNER_ADDRESS      "Elon"
+#define APP_DEFAULT_AGENT_PERSONA_ID         "hardware_mentor"
+#define APP_DEFAULT_AGENT_CUSTOM_PROMPT      ""
 
 static const app_config_field_t s_fields[] = {
     APP_CONFIG_FIELD(wifi_ssid, "wifi_ssid", APP_WIFI_SSID),
@@ -97,6 +102,11 @@ static const app_config_field_t s_fields[] = {
     APP_CONFIG_FIELD(llm_visible_cap_groups, "vis_cap_groups", APP_DEFAULT_LLM_VISIBLE_CAP_GROUPS),
     APP_CONFIG_FIELD(enabled_lua_modules, "en_lua_mods", APP_DEFAULT_ENABLED_LUA_MODULES),
     APP_CONFIG_FIELD(time_timezone, "time_timezone", APP_DEFAULT_TIME_TIMEZONE),
+    APP_CONFIG_FIELD(agent_display_name, "agent_name", APP_DEFAULT_AGENT_DISPLAY_NAME),
+    APP_CONFIG_FIELD(agent_owner_name, "agent_owner", APP_DEFAULT_AGENT_OWNER_NAME),
+    APP_CONFIG_FIELD(agent_owner_address, "owner_address", APP_DEFAULT_AGENT_OWNER_ADDRESS),
+    APP_CONFIG_FIELD(agent_persona_id, "persona_id", APP_DEFAULT_AGENT_PERSONA_ID),
+    APP_CONFIG_FIELD(agent_custom_prompt, "persona_custom", APP_DEFAULT_AGENT_CUSTOM_PROMPT),
 };
 
 // for backward compatibility, migrate from old settings to new settings
@@ -545,6 +555,53 @@ esp_err_t app_config_validate_wifi(const app_config_t *config, const char **mess
     return ESP_OK;
 }
 
+esp_err_t app_config_validate_agent(const app_config_t *config, const char **message)
+{
+    static const char *const valid_personas[] = {
+        "hardware_mentor",
+        "concise_engineer",
+        "friendly_assistant",
+        "custom",
+    };
+    bool persona_valid = false;
+
+    if (message) {
+        *message = NULL;
+    }
+    if (!config) {
+        if (message) {
+            *message = "Missing Agent configuration";
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!config->agent_display_name[0] || !config->agent_owner_name[0] ||
+            !config->agent_owner_address[0]) {
+        if (message) {
+            *message = "Agent name, owner name, and owner address are required";
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+    for (size_t i = 0; i < sizeof(valid_personas) / sizeof(valid_personas[0]); i++) {
+        if (strcmp(config->agent_persona_id, valid_personas[i]) == 0) {
+            persona_valid = true;
+            break;
+        }
+    }
+    if (!persona_valid) {
+        if (message) {
+            *message = "Unknown Agent persona";
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strcmp(config->agent_persona_id, "custom") == 0 && !config->agent_custom_prompt[0]) {
+        if (message) {
+            *message = "Custom persona text is required when custom mode is selected";
+        }
+        return ESP_ERR_INVALID_ARG;
+    }
+    return ESP_OK;
+}
+
 void app_config_to_claw(const app_config_t *config, app_claw_config_t *out)
 {
     if (!config || !out) {
@@ -587,6 +644,11 @@ void app_config_to_claw(const app_config_t *config, app_claw_config_t *out)
     strlcpy(out->enabled_cap_groups, config->enabled_cap_groups, sizeof(out->enabled_cap_groups));
     strlcpy(out->llm_visible_cap_groups, config->llm_visible_cap_groups, sizeof(out->llm_visible_cap_groups));
     strlcpy(out->enabled_lua_modules, config->enabled_lua_modules, sizeof(out->enabled_lua_modules));
+    strlcpy(out->agent_display_name, config->agent_display_name, sizeof(out->agent_display_name));
+    strlcpy(out->agent_owner_name, config->agent_owner_name, sizeof(out->agent_owner_name));
+    strlcpy(out->agent_owner_address, config->agent_owner_address, sizeof(out->agent_owner_address));
+    strlcpy(out->agent_persona_id, config->agent_persona_id, sizeof(out->agent_persona_id));
+    strlcpy(out->agent_custom_prompt, config->agent_custom_prompt, sizeof(out->agent_custom_prompt));
 }
 
 const char *app_config_get_timezone(const app_config_t *config)

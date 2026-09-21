@@ -21,6 +21,7 @@ const iconClass = 'w-4 h-4 shrink-0';
 const IconStatus: Component = () => <Activity class={iconClass} />;
 const IconGear: Component = () => <Settings class={iconClass} />;
 const IconWifi: Component = () => <WifiPen class={iconClass} />;
+const IconAgent: Component = () => <Bot class={iconClass} />;
 const IconLlm: Component = () => <Bot class={iconClass} />;
 const IconIm: Component = () => <MessageSquareCode class={iconClass} />;
 const IconSearch: Component = () => <Search class={iconClass} />;
@@ -36,6 +37,7 @@ export type LeafNode = {
   labelKey:
     | 'navStatus'
     | 'navBasic'
+    | 'navAgent'
     | 'navLlm'
     | 'navIm'
     | 'navWebReq'
@@ -64,6 +66,7 @@ export const NAV_TREE: NavNode[] = [
     icon: IconGear,
     children: [
       { kind: 'leaf', id: 'basic', labelKey: 'navBasic', icon: IconWifi },
+      { kind: 'leaf', id: 'agent', labelKey: 'navAgent', icon: IconAgent },
       { kind: 'leaf', id: 'llm', labelKey: 'navLlm', icon: IconLlm },
       { kind: 'leaf', id: 'im', labelKey: 'navIm', icon: IconIm },
       { kind: 'leaf', id: 'webreq', labelKey: 'navWebReq', icon: IconSearch },
@@ -104,7 +107,7 @@ type SidebarProps = {
   onCloseMobile?: () => void;
 };
 
-const EXPANDED_STORAGE_KEY = 'esp-claw-sidebar-expanded';
+const EXPANDED_STORAGE_KEY = 'nova-agent-sidebar-expanded';
 
 function readExpanded(): Set<string> {
   try {
@@ -287,7 +290,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
               when={isMobileDrawer()}
               fallback={
                 <span class="block text-[0.7rem] font-bold text-[var(--color-text-muted)] truncate">
-                  ESP-Claw Web Config
+                  Nova ESP32 Agent
                 </span>
               }
             >

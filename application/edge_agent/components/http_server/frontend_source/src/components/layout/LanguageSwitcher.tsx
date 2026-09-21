@@ -3,7 +3,7 @@ import { createEffect, createSignal, For, onCleanup } from 'solid-js';
 import { currentLocale, LOCALES, setLocale, t } from '../../i18n';
 
 const iconButtonClass =
-  'inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-white/[0.04] hover:border-white/[0.12] hover:text-[var(--color-text-primary)] transition';
+  'hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-white/[0.04] hover:border-white/[0.12] hover:text-[var(--color-text-primary)] transition';
 
 function GitHubIcon() {
   return (
@@ -84,8 +84,14 @@ export function LanguageSwitcher() {
           aria-expanded={open()}
         >
           <Languages class="w-4 h-4" />
-          <span>{currentLabel()}</span>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" class="opacity-75">
+          <span class="hidden sm:inline">{currentLabel()}</span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            class="hidden opacity-75 sm:block"
+          >
             <path
               d="M2.5 4L5 6.5L7.5 4"
               stroke="currentColor"

@@ -107,6 +107,7 @@ static esp_err_t main_save_config(const app_config_t *config)
 
     ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
     ESP_RETURN_ON_ERROR(app_config_validate_wifi(config, NULL), TAG, "Invalid Wi-Fi config");
+    ESP_RETURN_ON_ERROR(app_config_validate_agent(config, NULL), TAG, "Invalid Agent config");
 
     err = app_config_save(config);
     if (err != ESP_OK) {
@@ -319,8 +320,8 @@ void app_main(void)
     esp_log_level_set("http_reuse", ESP_LOG_WARN);
 
     ESP_LOGI(TAG, "Starting app");
-    ESP_LOGI(TAG, "ESP-Claw version: %s", claw_get_version());
-    ESP_LOGI(TAG, "ESP-Claw git version: %s", claw_get_git_version());
+    ESP_LOGI(TAG, "Nova ESP32 Agent core version: %s", claw_get_version());
+    ESP_LOGI(TAG, "Nova ESP32 Agent git version: %s", claw_get_git_version());
     ESP_LOGI(TAG, "Edge Agent version: %s", edge_agent_get_version());
     ESP_ERROR_CHECK(app_allocate_runtime_state());
     ESP_ERROR_CHECK(init_nvs());

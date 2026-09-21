@@ -76,6 +76,12 @@ static const config_field_def_t CONFIG_FIELDS[] = {
     CONFIG_FIELD("skills",       enabled_lua_modules),
 
     CONFIG_FIELD("time",         time_timezone),
+
+    CONFIG_FIELD("agent",        agent_display_name),
+    CONFIG_FIELD("agent",        agent_owner_name),
+    CONFIG_FIELD("agent",        agent_owner_address),
+    CONFIG_FIELD("agent",        agent_persona_id),
+    CONFIG_FIELD("agent",        agent_custom_prompt),
 };
 
 static const size_t CONFIG_FIELD_COUNT = sizeof(CONFIG_FIELDS) / sizeof(CONFIG_FIELDS[0]);
@@ -323,6 +329,13 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         if (!cJSON_IsString(item)) {
             continue;
         }
+        if (strlen(item->valuestring) >= field->size) {
+            cJSON_Delete(root);
+            free(config);
+            return httpd_resp_send_err(req,
+                                       HTTPD_400_BAD_REQUEST,
+                                       "Configuration value exceeds its maximum length");
+        }
         if (strcmp(field->name, "llm_max_tokens") == 0 ||
                 strcmp(field->name, "llm_default_image_max_bytes") == 0) {
             if (!is_positive_decimal_string(item->valuestring)) {
@@ -364,6 +377,13 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, wifi_config_error);
     }
 
+    const char *agent_config_error = NULL;
+    err = app_config_validate_agent(config, &agent_config_error);
+    if (err != ESP_OK) {
+        free(config);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, agent_config_error);
+    }
+
     err = ctx->services.save_config(config);
     free(config);
     if (err != ESP_OK) {
@@ -380,7 +400,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(resp, "ok", true);
     cJSON_AddNumberToObject(resp, "applied", (double)applied_count);
     http_server_json_add_string(resp, "message",
-                                "Saved. Restart the device to apply Wi-Fi, core LLM, capability, and Lua module changes.");
+                                "Saved. Restart the device to apply Wi-Fi, Agent persona, core LLM, capability, and Lua module changes.");
     return http_server_send_json_response(req, resp);
 }
 

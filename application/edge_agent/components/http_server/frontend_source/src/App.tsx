@@ -18,6 +18,9 @@ const StatusPage = lazy(() =>
 const BasicPage = lazy(() =>
   import('./pages/BasicPage').then((mod) => ({ default: mod.BasicPage })),
 );
+const AgentPage = lazy(() =>
+  import('./pages/AgentPage').then((mod) => ({ default: mod.AgentPage })),
+);
 const WebReqPage = lazy(() =>
   import('./pages/WebReqPage').then((mod) => ({ default: mod.WebReqPage })),
 );
@@ -242,6 +245,9 @@ const App: Component = () => {
                 <BasicPage
                   onRestartRequest={() => void handleRestartRequest({ reloadOnSuccess: true })}
                 />
+              </Show>
+              <Show when={currentTab() === 'agent'}>
+                <AgentPage />
               </Show>
               <Show when={currentTab() === 'llm'}>
                 <LlmPage />

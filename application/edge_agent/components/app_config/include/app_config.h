@@ -14,6 +14,10 @@ extern "C" {
 
 #define APP_CONFIG_STR_LEN        320
 #define APP_CONFIG_TIMEZONE_LEN   32
+#define APP_CONFIG_AGENT_NAME_LEN 48
+#define APP_CONFIG_OWNER_NAME_LEN 64
+#define APP_CONFIG_PERSONA_ID_LEN 32
+#define APP_CONFIG_PERSONA_PROMPT_LEN 1024
 
 #define APP_WIFI_SSID             CONFIG_APP_WIFI_SSID
 #define APP_WIFI_PASSWORD         CONFIG_APP_WIFI_PASSWORD
@@ -54,6 +58,11 @@ typedef struct {
     char llm_visible_cap_groups[APP_CONFIG_STR_LEN];
     char enabled_lua_modules[APP_CONFIG_STR_LEN];
     char time_timezone[APP_CONFIG_TIMEZONE_LEN];
+    char agent_display_name[APP_CONFIG_AGENT_NAME_LEN];
+    char agent_owner_name[APP_CONFIG_OWNER_NAME_LEN];
+    char agent_owner_address[APP_CONFIG_AGENT_NAME_LEN];
+    char agent_persona_id[APP_CONFIG_PERSONA_ID_LEN];
+    char agent_custom_prompt[APP_CONFIG_PERSONA_PROMPT_LEN];
 } app_config_t;
 
 esp_err_t app_config_init(void);
@@ -61,6 +70,7 @@ void app_config_load_defaults(app_config_t *config);
 esp_err_t app_config_load(app_config_t *config);
 esp_err_t app_config_save(const app_config_t *config);
 esp_err_t app_config_validate_wifi(const app_config_t *config, const char **message);
+esp_err_t app_config_validate_agent(const app_config_t *config, const char **message);
 void app_config_to_claw(const app_config_t *config, app_claw_config_t *out);
 const char *app_config_get_timezone(const app_config_t *config);
 

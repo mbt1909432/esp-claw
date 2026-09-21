@@ -29,10 +29,10 @@ export const SavePanel: Component<SavePanelProps> = (props) => {
           ●&nbsp;{t('unsavedIndicator')}
         </span>
       </Show>
-      <div class="flex-1" />
+      <div class="hidden flex-1 sm:block" />
       <Show when={props.message}>{props.message}</Show>
       <Show when={props.note}>
-        <span class="min-w-[200px] text-right text-[0.78rem] text-[var(--color-text-muted)]">
+        <span class="order-first w-full min-w-0 text-left text-[0.78rem] text-[var(--color-text-muted)] sm:order-none sm:w-auto sm:min-w-[200px] sm:text-right">
           {props.note}
         </span>
       </Show>

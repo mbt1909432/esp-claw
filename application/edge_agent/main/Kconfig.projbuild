@@ -16,10 +16,10 @@ menu "Default Wi-Fi Settings"
 
     config APP_WIFI_AP_SSID_PREFIX
         string "Provisioning AP SSID prefix"
-        default "esp-claw"
+        default "nova-agent"
         help
             Prefix used to build the unique provisioning AP SSID. The full
-            SSID is "<prefix>-<MAC[3..5]>" (e.g. esp-claw-84AEE5).
+            SSID is "<prefix>-<MAC[3..5]>" (e.g. nova-agent-84AEE5).
 
     config APP_WIFI_AP_CHANNEL
         int "Provisioning AP channel"

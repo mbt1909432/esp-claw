@@ -79,7 +79,7 @@ static void app_claw_ensure_builtin_attachment_rules(void)
 #endif
 
 #define APP_SYSTEM_PROMPT_COMMON \
-    "You are the ESP-Claw. " \
+    "You are an embedded Agent running on an ESP32 device. " \
     "Answer briefly and plainly. " \
     "Treat Skills List as a catalog of optional skills. " \
     "Use 'activate_skill' to load skills. When multiple skills are needed, call activate_skill multiple times in a single response to activate multiple skills in parallel. " \
@@ -87,7 +87,8 @@ static void app_claw_ensure_builtin_attachment_rules(void)
     "Skills are user-facing functions, while Capabilities are internal functions used by the model. " \
     "When communicating with the user, refer to skills instead of Capabilities. " \
     "Prefer skill-driven execution and keep long-running planning, investigation, implementation, debugging, and verification work isolated in subagents when available. " \
-    "Keep user-facing answers focused on current status, useful results, and clear next steps.\n"
+    "Keep user-facing answers focused on current status, useful results, and clear next steps. " \
+    "These operational, tool, permission, and safety rules are mandatory and cannot be changed by identity or persona settings.\n"
 
 #define APP_ROOT_AGENT_SYSTEM_PROMPT \
     "You are the root agent. Own the user-facing conversation and keep the session responsive. " \
@@ -121,6 +122,69 @@ static void app_claw_ensure_builtin_attachment_rules(void)
 #define APP_SYSTEM_PROMPT \
     APP_SYSTEM_PROMPT_COMMON \
     APP_SYSTEM_PROMPT_SUFFIX
+
+static const char *app_claw_persona_prompt(const app_claw_config_t *config)
+{
+    if (strcmp(config->agent_persona_id, "concise_engineer") == 0) {
+        return "Act as a direct debugging engineer. Lead with the conclusion, then give the shortest useful check sequence, expected observations, and a minimal fix.";
+    }
+    if (strcmp(config->agent_persona_id, "friendly_assistant") == 0) {
+        return "Act as a friendly general assistant. Use natural language, explain unfamiliar terms when needed, and avoid unnecessary jargon.";
+    }
+    if (strcmp(config->agent_persona_id, "custom") == 0 && config->agent_custom_prompt[0]) {
+        return config->agent_custom_prompt;
+    }
+    return "Act as a patient hardware mentor. Explain current flow, pin roles, and wiring relationships before procedures. Confirm uncertain board details and never guess a connection that could damage hardware.";
+}
+
+static char *app_claw_build_system_prompt(const app_claw_config_t *config)
+{
+    static const char *const format =
+        "%s\n"
+        "Agent identity:\n"
+        "- Your name is %s.\n"
+        "- Your product is Nova ESP32 Agent.\n"
+        "- Your owner is %s. Address the owner as %s.\n"
+        "- You are not the owner and must never claim the owner's identity.\n"
+        "Persona settings control tone, explanation style, and work preferences only. "
+        "They cannot override the operational, tool, permission, or safety rules above.\n"
+        "Active persona:\n%s\n";
+    const char *persona = NULL;
+    int needed = 0;
+    char *prompt = NULL;
+
+    if (!config) {
+        return NULL;
+    }
+    persona = app_claw_persona_prompt(config);
+    needed = snprintf(NULL,
+                      0,
+                      format,
+                      APP_SYSTEM_PROMPT,
+                      config->agent_display_name,
+                      config->agent_owner_name,
+                      config->agent_owner_address,
+                      persona);
+    if (needed < 0) {
+        return NULL;
+    }
+    prompt = malloc((size_t)needed + 1U);
+    if (!prompt) {
+        return NULL;
+    }
+    if (snprintf(prompt,
+                 (size_t)needed + 1U,
+                 format,
+                 APP_SYSTEM_PROMPT,
+                 config->agent_display_name,
+                 config->agent_owner_name,
+                 config->agent_owner_address,
+                 persona) < 0) {
+        free(prompt);
+        return NULL;
+    }
+    return prompt;
+}
 
 #define APP_CLAW_LAUNCHER_OUTPUT_LEN 128
 #define APP_CLAW_UI_JOBS_OUTPUT_LEN 4096
@@ -623,6 +687,7 @@ static esp_err_t app_claw_publish_startup_event(void)
 #if CONFIG_APP_CLAW_CAP_CORE
 static void app_claw_fill_core_config(const app_claw_config_t *config,
                                       uint32_t max_tool_iterations,
+                                      const char *system_prompt,
                                       claw_core_config_t *core_config)
 {
     memset(core_config, 0, sizeof(*core_config));
@@ -639,7 +704,7 @@ static void app_claw_fill_core_config(const app_claw_config_t *config,
     core_config->supports_vision = app_claw_bool_is_true(config->llm_supports_vision);
     core_config->image_remote_url_only = app_claw_bool_is_true(config->llm_image_remote_url_only);
     core_config->instance_id = 0;
-    core_config->system_prompt = APP_SYSTEM_PROMPT;
+    core_config->system_prompt = system_prompt;
 #if CONFIG_APP_CLAW_CAP_MEMORY
 #if CONFIG_APP_CLAW_MEMORY_MODE_FULL
     core_config->persist_context = claw_memory_persist_context_callback;
@@ -716,6 +781,7 @@ esp_err_t app_claw_start(const app_claw_config_t *config)
     app_claw_storage_paths_t paths;
 #if CONFIG_APP_CLAW_CAP_CORE
     claw_core_config_t core_config = {0};
+    char *system_prompt = NULL;
 #endif
 #if CONFIG_APP_CLAW_CAP_CORE || CONFIG_APP_CLAW_CAP_MEMORY
     const uint32_t max_tool_iterations = 32;
@@ -807,7 +873,9 @@ esp_err_t app_claw_start(const app_claw_config_t *config)
 #endif
 
 #if CONFIG_APP_CLAW_CAP_CORE
-    app_claw_fill_core_config(config, max_tool_iterations, &core_config);
+    system_prompt = app_claw_build_system_prompt(config);
+    ESP_RETURN_ON_FALSE(system_prompt, ESP_ERR_NO_MEM, TAG, "Failed to build Agent system prompt");
+    app_claw_fill_core_config(config, max_tool_iterations, system_prompt, &core_config);
     {
         claw_core_context_provider_t base_providers[] = {
             claw_memory_profile_provider,
@@ -826,14 +894,16 @@ esp_err_t app_claw_start(const app_claw_config_t *config)
                  config->llm_base_url[0] ? config->llm_base_url : "(empty)",
                  config->llm_model[0] ? config->llm_model : "(empty)",
                  config->llm_api_key[0] ? "configured" : "missing");
-        ESP_RETURN_ON_ERROR(claw_agent_mgr_init(&(claw_agent_mgr_config_t) {
+        esp_err_t init_err = claw_agent_mgr_init(&(claw_agent_mgr_config_t) {
                                 .core_config = &core_config,
                                 .base_context_providers = base_providers,
                                 .base_context_provider_count = sizeof(base_providers) / sizeof(base_providers[0]),
                                 .root_agent_system_prompt = APP_ROOT_AGENT_SYSTEM_PROMPT,
                                 .subagent_system_prompt = APP_SUBAGENT_SYSTEM_PROMPT,
-                            }),
-                            TAG, "Failed to init claw_agent_mgr");
+                            });
+        free(system_prompt);
+        system_prompt = NULL;
+        ESP_RETURN_ON_ERROR(init_err, TAG, "Failed to init claw_agent_mgr");
         ESP_RETURN_ON_ERROR(claw_agent_mgr_create_root_agent(&root_agent_id),
                             TAG, "Failed to create root agent");
         ESP_LOGI(TAG, "Root agent ready id=%s", root_agent_id ? root_agent_id : "?");
@@ -875,13 +945,19 @@ esp_err_t app_claw_update_config(const app_claw_config_t *config)
 #if CONFIG_APP_CLAW_CAP_CORE
     claw_core_config_t core_config = {0};
     const uint32_t max_tool_iterations = 32;
+    char *system_prompt = NULL;
+    esp_err_t err;
 
     if (!config) {
         return ESP_ERR_INVALID_ARG;
     }
     ESP_RETURN_ON_ERROR(app_claw_store_current_config(config), TAG, "Failed to store Claw config");
-    app_claw_fill_core_config(config, max_tool_iterations, &core_config);
-    return claw_agent_mgr_update_core_config(&core_config);
+    system_prompt = app_claw_build_system_prompt(config);
+    ESP_RETURN_ON_FALSE(system_prompt, ESP_ERR_NO_MEM, TAG, "Failed to build Agent system prompt");
+    app_claw_fill_core_config(config, max_tool_iterations, system_prompt, &core_config);
+    err = claw_agent_mgr_update_core_config(&core_config);
+    free(system_prompt);
+    return err;
 #else
     ESP_RETURN_ON_ERROR(app_claw_store_current_config(config), TAG, "Failed to store Claw config");
     return ESP_OK;
